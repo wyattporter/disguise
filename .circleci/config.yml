@@ -1,0 +1,42 @@
+# Check https://circleci.com/docs/2.0/language-go/ for more details
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/golang:1.9
+    working_directory: /go/src/github.com/wyattporter/disguise
+    steps:
+      - checkout
+      - run:
+          name: install dep
+          command: |
+            # https://golang.github.io/dep/docs/installation.html#install-from-source
+            go get -d -u github.com/golang/dep
+            cd $(go env GOPATH)/src/github.com/golang/dep
+            DEP_LATEST=$(git describe --abbrev=0 --tags)
+            git checkout $DEP_LATEST
+            go install -ldflags="-X main.version=$DEP_LATEST" ./cmd/dep
+      - run:
+          name: install dependencies
+          command: dep ensure
+      - run:
+          name: build disguise
+          command: make GO="$(command -v go)"
+      - run:
+          name: test disguise
+          command: make GO="$(command -v go)" test
+      - run:
+          name: test generate manpage
+          command: |
+            sudo apt-get update
+            sudo apt-get install --assume-yes --quiet groff-base
+            cd vendor/github.com/slyrz/mango
+            go build
+            cd -
+            ./vendor/github.com/slyrz/mango/mango -preview disguise.go
+      - run:
+          name: coverage report
+          command: |
+            curl -s https://codecov.io/bash > .codecov
+            chmod +x .codecov
+            ./.codecov -f disguise.coverage
