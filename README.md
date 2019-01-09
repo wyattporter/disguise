@@ -5,10 +5,15 @@ Provides endpoint `/:digest/:url`.
 
 
 ## example configuration
+
+Install binary as `/usr/bin/disguise`.
+
 ### `nginx`
 
+Use `nginx` as reverse proxy:
+
     # /etc/nginx/sites-enabled/disguise
-    # disguise 
+    # disguise upstream server location
     upstream disguise {
      server unix:/run/disguise/sock;
     }
@@ -17,12 +22,12 @@ Provides endpoint `/:digest/:url`.
      # ...
 
      # storage path for downloaded images
-     set $disguise_store "/var/cache/nginx/disguise"
-     # image proxy location
+     set $disguise_store "/var/cache/nginx/disguise";
+     # image proxy location on arbitrary subpath
      location /i/ {
       rewrite ^/i/(.*)$ /$1 break;
       root $disguise_store;
-      # check if downloaded, otherwise use disguise
+      # check if already downloaded, otherwise use disguise
       try_files $uri @disguise;
      }
      location @disguise {
@@ -37,6 +42,8 @@ Provides endpoint `/:digest/:url`.
 
 ### `systemd`
 
+Configure `systemd` service:
+
     # /etc/systemd/system/disguise.service
     [Unit]
     Description=disguise: camo, simplified
@@ -46,11 +53,9 @@ Provides endpoint `/:digest/:url`.
     [Service]
     Type=simple
     Environment=CAMO_KEY=0x24FEEDFACEDEADBEEFCAFE
-    Environment=NETWORK=unix
-    Environment=ADDRESS=/run/disguise/sock
-    ExecStartPre=/usr/bin/install --directory --owner=www-data --group=www-data /run/disguise
-    ExecStart=/usr/bin/disguise -n "${NETWORK}" -a "${ADDRESS}"
-    ExecStopPost=/bin/rm /run/disguise/sock
+    ExecStartPre=/usr/bin/install --directory --owner=www-data --group=www-data "/run/disguise"
+    ExecStart=/usr/bin/disguise -n "unix" -a "/run/disguise/sock"
+    ExecStopPost=/bin/rm -f "/run/disguise/sock"
     User=www-data
     Group=www-data
     MemoryDenyWriteExecute=True
