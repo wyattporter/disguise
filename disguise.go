@@ -26,6 +26,7 @@ package main
 import "context"
 import "crypto/hmac"
 import "crypto/sha1"
+import "crypto/tls"
 import "encoding/hex"
 import "errors"
 import "flag"
@@ -152,7 +153,24 @@ func (d disguise) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	request.Header.Set("Accept", "image/*")
 
 	log.Println("I:", string(decoded[url]))
-	if response, err = http.DefaultClient.Do(request); err != nil {
+	if response, err = (&http.Client{
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+				DualStack: true,
+			}).DialContext,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+			TLSClientConfig: &tls.Config{
+				ServerName: request.URL.Hostname(),
+			},
+		},
+		Timeout: 300 * time.Second,
+	}).Do(request); err != nil {
 		goto E500
 	}
 
